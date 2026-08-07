@@ -1,0 +1,7 @@
+test_dd_bot_hardware:
+  ros__parameters:
+    serial_port: /dev/ttyACM0
+    baud_rate: 9600
+    timeout_ms: 100
+    wheel_radius: 0.065
+    wheel_base: 0.34
