@@ -1,10 +1,7 @@
 #include <algorithm>
 #include <array>
-#include <chrono>
 #include <cmath>
-#include <cstring>
 #include <fcntl.h>
-#include <memory>
 #include <string>
 #include <termios.h>
 #include <unistd.h>
@@ -18,21 +15,26 @@
 namespace test_dd_bot_hardware {
 class TestDDBotHardware : public hardware_interface::SystemInterface {
   public:
-    hardware_interface::return_type configure(const hardware_interface::HardwareInfo &info) override {
-        if (configure_default(info) != hardware_interface::return_type::OK) {
-            return hardware_interface::return_type::ERROR;
+    hardware_interface::CallbackReturn on_init(const hardware_interface::HardwareInfo &info) override {
+        if (hardware_interface::SystemInterface::on_init(info) != hardware_interface::CallbackReturn::SUCCESS) {
+            return hardware_interface::CallbackReturn::ERROR;
         }
 
         hw_positions_.resize(info.joints.size(), 0.0);
         hw_velocities_.resize(info.joints.size(), 0.0);
         hw_commands_.resize(info.joints.size(), 0.0);
 
-        serial_port_  = info_.hardware_parameters.at("serial_port");
-        baud_rate_    = std::stoi(info_.hardware_parameters.at("baud_rate"));
-        wheel_radius_ = std::stod(info_.hardware_parameters.at("wheel_radius"));
-        wheel_base_   = std::stod(info_.hardware_parameters.at("wheel_base"));
+        serial_port_  = info_.hardware_parameters["serial_port"];
+        baud_rate_    = std::stoi(info_.hardware_parameters["baud_rate"]);
+        wheel_radius_ = std::stod(info_.hardware_parameters["wheel_radius"]);
+        wheel_base_   = std::stod(info_.hardware_parameters["wheel_base"]);
 
-        return hardware_interface::return_type::OK;
+        return hardware_interface::CallbackReturn::SUCCESS;
+    }
+
+    hardware_interface::CallbackReturn on_configure(const hardware_interface::HardwareInfo &info) override {
+        (void)info;
+        return hardware_interface::CallbackReturn::SUCCESS;
     }
 
     std::vector<hardware_interface::StateInterface> export_state_interfaces() override {
@@ -52,18 +54,18 @@ class TestDDBotHardware : public hardware_interface::SystemInterface {
         return command_interfaces;
     }
 
-    hardware_interface::return_type start() override {
+    hardware_interface::CallbackReturn on_activate(const rclcpp_lifecycle::State &) override {
         fd_ = open(serial_port_.c_str(), O_RDWR | O_NOCTTY | O_SYNC);
         if (fd_ < 0) {
             RCLCPP_ERROR(rclcpp::get_logger("TestDDBotHardware"), "Unable to open serial port: %s", serial_port_.c_str());
-            return hardware_interface::return_type::ERROR;
+            return hardware_interface::CallbackReturn::ERROR;
         }
 
         termios tty{};
         if (tcgetattr(fd_, &tty) != 0) {
             close(fd_);
             fd_ = -1;
-            return hardware_interface::return_type::ERROR;
+            return hardware_interface::CallbackReturn::ERROR;
         }
 
         cfsetispeed(&tty, baud_rate_);
@@ -81,18 +83,18 @@ class TestDDBotHardware : public hardware_interface::SystemInterface {
         if (tcsetattr(fd_, TCSANOW, &tty) != 0) {
             close(fd_);
             fd_ = -1;
-            return hardware_interface::return_type::ERROR;
+            return hardware_interface::CallbackReturn::ERROR;
         }
 
-        return hardware_interface::return_type::OK;
+        return hardware_interface::CallbackReturn::SUCCESS;
     }
 
-    hardware_interface::return_type stop() override {
+    hardware_interface::CallbackReturn on_deactivate(const rclcpp_lifecycle::State &) override {
         if (fd_ >= 0) {
             close(fd_);
             fd_ = -1;
         }
-        return hardware_interface::return_type::OK;
+        return hardware_interface::CallbackReturn::SUCCESS;
     }
 
     hardware_interface::return_type read() override {
