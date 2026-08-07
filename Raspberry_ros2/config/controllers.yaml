@@ -27,7 +27,7 @@ diff_drive_controller:
 
     publish_rate: 50.0
 
-    use_stamped_vel: false
+    use_stamped_vel: true
 
     linear.x.has_velocity_limits: true
     linear.x.max_velocity: 0.6

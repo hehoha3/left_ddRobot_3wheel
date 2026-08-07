@@ -136,14 +136,22 @@ class TestDDBotHardware : public hardware_interface::SystemInterface {
             return hardware_interface::return_type::ERROR;
         }
 
-        // int left_pwm  = static_cast<int>(std::lround(hw_commands_[0] * 255.0 / 0.6));
-        // int right_pwm = static_cast<int>(std::lround(hw_commands_[1] * 255.0 / 0.6));
-        int left_pwm  = static_cast<int>(hw_commands_[0]);
-        int right_pwm = static_cast<int>(hw_commands_[1]);
-        // left_pwm      = std::clamp(left_pwm, -255, 255);
-        // right_pwm     = std::clamp(right_pwm, -255, 255);
+        constexpr double MAX_WHEEL_SPEED = 9.23;   // rad/s
+        constexpr double MAX_PWM = 255.0;
 
-        std::string msg = "m " + std::to_string(left_pwm) + " " + std::to_string(right_pwm) + "\n";
+        int left_pwm  = static_cast<int>(std::lround(hw_commands_[0] * MAX_PWM / MAX_WHEEL_SPEED));
+        int right_pwm = static_cast<int>(std::lround(hw_commands_[1] * MAX_PWM / MAX_WHEEL_SPEED));
+        left_pwm      = std::clamp(left_pwm, -255, 255);
+        right_pwm     = std::clamp(right_pwm, -255, 255);
+
+        std::ostringstream ss;
+        ss << "o "
+            << left_pwm
+            << " "
+            << right_pwm
+            << "\r";
+        std::string msg = ss.str();
+
         auto bytes_written = ::write(fd_, msg.c_str(), msg.size());
         if (bytes_written < 0) {
             RCLCPP_ERROR(rclcpp::get_logger("TestDDBotHardware"), "Serial write failed: %s", std::strerror(errno));
