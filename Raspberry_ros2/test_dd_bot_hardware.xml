@@ -1,0 +1,7 @@
+<library path="test_dd_bot_hardware">
+  <class name="test_dd_bot_hardware/TestDDBotHardware"
+         type="test_dd_bot_hardware::TestDDBotHardware"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>Hardware interface mock for a differential drive robot controlled by Arduino bridge.</description>
+  </class>
+</library>
