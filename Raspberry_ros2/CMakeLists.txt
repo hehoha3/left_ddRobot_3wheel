@@ -36,6 +36,7 @@ install(TARGETS
 
 install(DIRECTORY launch config description DESTINATION share/${PROJECT_NAME})
 install(FILES test_dd_bot_hardware.xml DESTINATION share/${PROJECT_NAME})
+pluginlib_export_plugin_description_file(hardware_interface test_dd_bot_hardware.xml)
 
 ament_export_dependencies(rclcpp geometry_msgs hardware_interface pluginlib rclcpp_lifecycle)
 ament_package()

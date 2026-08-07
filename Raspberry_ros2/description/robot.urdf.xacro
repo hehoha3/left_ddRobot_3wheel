@@ -83,8 +83,10 @@
   <ros2_control name="TestDDBotHardware" type="system">
     <hardware>
       <plugin>test_dd_bot_hardware/TestDDBotHardware</plugin>
-      <param name="serial_port">/dev/ttyUSB0</param>
+      <param name="serial_port">/dev/ttyACM0</param>
       <param name="baud_rate">9600</param>
+      <param name="wheel_radius">0.065</param>
+      <param name="wheel_base">0.34</param>
     </hardware>
     <joint name="left_wheel_joint">
       <command_interface name="velocity"/>
