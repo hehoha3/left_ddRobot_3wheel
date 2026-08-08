@@ -44,7 +44,7 @@ class DemoMotionNode : public rclcpp::Node {
             RCLCPP_INFO(this->get_logger(), "Demo motion finished.");
         }
 
-        twist_stamped.header.stamp = this->now();
+        twist_stamped.header.stamp    = this->now();
         twist_stamped.header.frame_id = "base_link";
 
         publisher_->publish(twist_stamped);

@@ -25,7 +25,6 @@ class TestDDBotHardware : public hardware_interface::SystemInterface {
         hw_velocities_.resize(info_.joints.size(), 0.0);
         hw_commands_.resize(info_.joints.size(), 0.0);
 
-
         serial_port_  = info_.hardware_parameters["serial_port"];
         baud_rate_    = std::stoi(info_.hardware_parameters["baud_rate"]);
         wheel_radius_ = std::stod(info_.hardware_parameters["wheel_radius"]);
@@ -53,17 +52,28 @@ class TestDDBotHardware : public hardware_interface::SystemInterface {
 
     speed_t map_baud_rate(int baud) {
         switch (baud) {
-            case 1200: return B1200;
-            case 1800: return B1800;
-            case 2400: return B2400;
-            case 4800: return B4800;
-            case 9600: return B9600;
-            case 19200: return B19200;
-            case 38400: return B38400;
-            case 57600: return B57600;
-            case 115200: return B115200;
-            case 230400: return B230400;
-            default: return B9600;
+        case 1200:
+            return B1200;
+        case 1800:
+            return B1800;
+        case 2400:
+            return B2400;
+        case 4800:
+            return B4800;
+        case 9600:
+            return B9600;
+        case 19200:
+            return B19200;
+        case 38400:
+            return B38400;
+        case 57600:
+            return B57600;
+        case 115200:
+            return B115200;
+        case 230400:
+            return B230400;
+        default:
+            return B9600;
         }
     }
 
@@ -93,7 +103,7 @@ class TestDDBotHardware : public hardware_interface::SystemInterface {
         tty.c_oflag     = 0;
         tty.c_lflag     = 0;
         tty.c_cc[VMIN]  = 0;
-        tty.c_cc[VTIME] = 1;  // 0.1 second timeout
+        tty.c_cc[VTIME] = 1; // 0.1 second timeout
         tty.c_cflag |= (CLOCAL | CREAD);
         tty.c_cflag &= ~(PARENB | PARODD);
         tty.c_cflag &= ~CSTOPB;
@@ -136,8 +146,8 @@ class TestDDBotHardware : public hardware_interface::SystemInterface {
             return hardware_interface::return_type::ERROR;
         }
 
-        constexpr double MAX_WHEEL_SPEED = 9.23;   // rad/s
-        constexpr double MAX_PWM = 255.0;
+        constexpr double MAX_WHEEL_SPEED = 9.23; // rad/s
+        constexpr double MAX_PWM         = 255.0;
 
         int left_pwm  = static_cast<int>(std::lround(hw_commands_[0] * MAX_PWM / MAX_WHEEL_SPEED));
         int right_pwm = static_cast<int>(std::lround(hw_commands_[1] * MAX_PWM / MAX_WHEEL_SPEED));
@@ -146,10 +156,10 @@ class TestDDBotHardware : public hardware_interface::SystemInterface {
 
         std::ostringstream ss;
         ss << "o "
-            << left_pwm
-            << " "
-            << right_pwm
-            << "\r";
+           << left_pwm
+           << " "
+           << right_pwm
+           << "\r";
         std::string msg = ss.str();
 
         auto bytes_written = ::write(fd_, msg.c_str(), msg.size());
