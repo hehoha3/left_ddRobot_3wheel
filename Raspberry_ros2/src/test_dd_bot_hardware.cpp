@@ -148,27 +148,120 @@ class TestDDBotHardware : public hardware_interface::SystemInterface {
     }
 
     // Called every control loop cycle (realtime thread) to update joint state.
-    // NOTE: currently this reads raw bytes from serial but does NOT parse them
-    // into actual position/velocity feedback — it just drains the buffer.
-    // Position/velocity are instead integrated from the last commanded value,
-    // i.e. this is an open-loop simulation of the encoders, not real feedback.
-    hardware_interface::return_type read(const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/) override {
-        if (fd_ >= 0) {
-            std::array<char, 64> buffer{};
-            // Attempt a non-blocking read; EAGAIN/EWOULDBLOCK just means "no data yet".
-            auto bytes_read = ::read(fd_, buffer.data(), buffer.size());
-            if (bytes_read < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-                RCLCPP_WARN(rclcpp::get_logger("TestDDBotHardware"), "Serial read failed: %s", std::strerror(errno));
-            }
-            // NOTE: bytes_read data is discarded here — no parsing/feedback logic yet.
+    hardware_interface::return_type read(const rclcpp::Time & /*time*/, const rclcpp::Duration & period) override {
+        // Check serial port.
+        if (fd_ < 0) {
+            return hardware_interface::return_type::ERROR;
         }
 
-        // Fake integration: assume the last commanded velocity was achieved exactly.
-        // period is hardcoded to 0.02s (50 Hz) instead of using the actual `period` argument.
-        for (std::size_t i = 0; i < hw_commands_.size(); ++i) {
-            hw_positions_[i] += hw_commands_[i] * 0.02;
-            hw_velocities_[i] = hw_commands_[i];
+        // Request encoder values from Arduino.
+        // Arduino responds: "left_ticks right_ticks\r"
+        constexpr char ENCODER_COMMAND[] = "e\r";
+
+        const ssize_t command_bytes = ::write(fd_, ENCODER_COMMAND, sizeof(ENCODER_COMMAND) - 1);
+
+        if (command_bytes < 0) {
+            RCLCPP_ERROR(rclcpp::get_logger("TestDDBotHardware"),
+                         "Failed to request encoder data: %s",
+                         std::strerror(errno));
+
+            return hardware_interface::return_type::ERROR;
         }
+
+        // Store incomplete serial data between read() calls.
+        static std::string rx_buffer;
+        std::array<char, 128> buffer{};
+
+        // Read all available serial data.
+        while (true) {
+            const ssize_t bytes_read = ::read(fd_, buffer.data(), buffer.size());
+
+            // No more data available.
+            if (bytes_read < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    break;
+                }
+
+                RCLCPP_ERROR(rclcpp::get_logger("TestDDBotHardware"),
+                             "Serial read failed: %s",
+                             std::strerror(errno));
+
+                return hardware_interface::return_type::ERROR;
+            }
+
+            // No data received.
+            if (bytes_read == 0) {
+                break;
+            }
+
+            // Append received data to the buffer.
+            rx_buffer.append(buffer.data(), static_cast<std::size_t>(bytes_read));
+        }
+
+        // Wait until a complete packet is received.
+        const std::size_t end_pos = rx_buffer.find('\r');
+
+        if (end_pos == std::string::npos) {
+            return hardware_interface::return_type::OK;
+        }
+
+        // Extract one complete packet.
+        const std::string packet = rx_buffer.substr(0, end_pos);
+
+        // Remove the processed packet.
+        rx_buffer.erase(0, end_pos + 1);
+
+        // Parse: "left_ticks right_ticks"
+        long long left_ticks = 0;
+        long long right_ticks = 0;
+
+        std::istringstream iss(packet);
+
+        if (!(iss >> left_ticks >> right_ticks)) {
+
+            RCLCPP_WARN(rclcpp::get_logger("TestDDBotHardware"),
+                         "Invalid encoder packet: '%s'",
+                         packet.c_str());
+
+            return hardware_interface::return_type::OK;
+        }
+
+        // Encoder resolution.
+        constexpr double ENCODER_TICKS_PER_REV = 600.0;
+
+        // Convert encoder ticks to radians.
+        const double left_position = static_cast<double>(left_ticks) * (2.0 * M_PI / ENCODER_TICKS_PER_REV);
+        const double right_position = static_cast<double>(right_ticks) * (2.0 * M_PI / ENCODER_TICKS_PER_REV);
+
+        // Calculate wheel velocity: velocity = Δposition / Δtime.
+        const double dt = period.seconds();
+
+        if (dt > 0.0) {
+            hw_velocities_[0] = (left_position - hw_positions_[0]) / dt;
+            hw_velocities_[1] = (right_position - hw_positions_[1]) / dt;
+        }
+
+        // Update wheel positions.
+        hw_positions_[0] = left_position;
+        hw_positions_[1] = right_position;
+
+        // Print encoder data every 50 cycles.
+        static int read_count = 0;
+
+        if (++read_count % 50 == 0) {
+
+            RCLCPP_INFO(rclcpp::get_logger("TestDDBotHardware"),
+                         "Encoder: L=%lld ticks, R=%lld ticks | "
+                         "Position: L=%.3f rad, R=%.3f rad | "
+                         "Velocity: L=%.3f rad/s, R=%.3f rad/s",
+                         left_ticks,
+                         right_ticks,
+                         hw_positions_[0],
+                         hw_positions_[1],
+                         hw_velocities_[0],
+                         hw_velocities_[1]);
+        }
+
         return hardware_interface::return_type::OK;
     }
 
